@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 from podcast_finder import search_podcasts
 from social_media_finder import find_social_media_profiles
 from csv_exporter import generate_csv
@@ -51,10 +52,12 @@ if user_input:
         # Generate CSV
         if all_podcast_data:
             csv_data = generate_csv(all_podcast_data)
+            # Sanitize the user input for filename
+            sanitized_filename = re.sub(r'[^\w\-_\. ]', '_', user_input)
             st.download_button(
                 label="Download CSV",
                 data=csv_data,
-                file_name="podcast_results.csv",
+                file_name=f'podcast_results_{sanitized_filename}.csv',
                 mime="text/csv"
             )
     else:

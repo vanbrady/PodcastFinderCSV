@@ -1,46 +1,61 @@
-import requests
-from bs4 import BeautifulSoup
+import http.client
+import json
+import streamlit as st
+import time
 
+@st.cache_data(ttl=3600)  # Cache results for 1 hour
 def find_social_media_profiles(author):
     """
-    Find social media profiles for a given podcast author.
-    
+    Find social media profiles for a given podcast author using serper.dev API.
+
     Args:
     author (str): The name of the podcast author.
-    
+
     Returns:
     dict: A dictionary of social media platforms and their corresponding profile URLs.
     """
-    search_url = f"https://www.google.com/search?q={author} podcast social media"
+    # Define the headers for the HTTP request
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        'X-API-KEY': '54c237af76e25b52d3df0750c34b71e68651f1f7',  # Replace with your actual API key
+        'Content-Type': 'application/json'
     }
-    
-    try:
-        response = requests.get(search_url, headers=headers)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        social_media_platforms = {
-            "twitter.com": "Twitter",
-            "facebook.com": "Facebook",
-            "instagram.com": "Instagram",
-            "linkedin.com": "LinkedIn",
-            "youtube.com": "YouTube"
-        }
-        
-        profiles = {}
-        
-        for link in soup.find_all('a'):
-            href = link.get('href')
-            if href and href.startswith('/url?q='):
-                url = href.split('/url?q=')[1].split('&')[0]
-                for platform, name in social_media_platforms.items():
-                    if platform in url:
-                        profiles[name] = url
-                        break
-        
-        return profiles
-    except requests.RequestException as e:
-        print(f"Error finding social media profiles: {e}")
-        return {}
+
+    social_media_platforms = {
+        "linkedin.com/in/": "LinkedIn",
+        "twitter.com": "Twitter",
+        "facebook.com": "Facebook",
+        "instagram.com": "Instagram",
+        "youtube.com": "YouTube"
+    }
+
+    profiles = {}
+
+    for platform_query, platform_name in social_media_platforms.items():
+        # Prepare the search query with the author's name and platform name
+        payload = json.dumps({
+            "q": f"inurl:{platform_query} {author}"
+        })
+
+        # Establish the connection and send the request
+        conn = http.client.HTTPSConnection("google.serper.dev")
+        conn.request("POST", "/search", payload, headers)
+        res = conn.getresponse()
+        data = res.read().decode("utf-8")
+
+        # Parse the JSON response
+        search_results = json.loads(data)
+        try:
+            first_url = search_results['organic'][0]['link']
+        except (IndexError, KeyError):
+            first_url = None
+
+        # Log the profile URL
+        print(f"Author: {author} - {platform_name} URL: {first_url}")
+
+        if first_url:
+            profiles[platform_name] = first_url
+
+        # Wait for two seconds before making the next API call to avoid rate limits
+        time.sleep(2)
+
+    return profiles
